@@ -1,0 +1,11 @@
+﻿TOPIC
+	about_SidHistoryMigrator
+	
+SHORT DESCRIPTION
+	Explains how to use the SidHistoryMigrator powershell module
+	
+LONG DESCRIPTION
+	<Insert Content here>
+
+KEYWORDS
+	SidHistoryMigrator

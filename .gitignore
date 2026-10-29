@@ -1,0 +1,22 @@
+﻿
+# ignore the settings folder and files for VSCode and PSS
+.vscode/*
+*.psproj
+*TempPoint*
+
+# Ignore staging info from Visual Studio
+library/SidHistoryMigrator/.vs/*
+library/SidHistoryMigrator/SidHistoryMigrator/bin/*
+library/SidHistoryMigrator/SidHistoryMigrator/obj/*
+
+# ignore PowerShell Studio MetaData
+SidHistoryMigrator/SidHistoryMigrator.psproj
+SidHistoryMigrator/SidHistoryMigrator.psproj.bak
+SidHistoryMigrator/SidHistoryMigrator.psprojs
+SidHistoryMigrator/SidHistoryMigrator.psproj
+
+# ignore the TestResults
+TestResults/*
+
+# ignore the publishing Directory
+publish/*
