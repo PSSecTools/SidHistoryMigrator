@@ -1,4 +1,56 @@
 ﻿function Install-SHMigrator {
+	<#
+	.SYNOPSIS
+		Configures this computer to run scheduled SID history migrations.
+
+	.DESCRIPTION
+		Persists module paths at PSFramework's SystemDefault scope, creates a local
+		machine document-encryption certificate if needed, and registers the Sid History
+		Migrator scheduled task to invoke Invoke-SHMigration as SYSTEM every three hours.
+		Also initializes and tests the SidHistoryMigration Windows event log provider.
+
+	.PARAMETER ConfigPath
+		An existing directory in which task definitions and encrypted credentials
+		will be stored. Becomes SidHistoryMigrator.Path.ConfigRoot.
+
+	.PARAMETER TaskPath
+		The path to the PowerShell data file containing per-task Scopes and optional
+		Logging settings. Becomes SidHistoryMigrator.Path.TaskPath. This command stores
+		the path but does not create or validate the file's contents.
+
+	.PARAMETER LoggingRoot
+		An optional directory for per-task JSON action logs. Becomes
+		SidHistoryMigrator.Path.LoggingRoot. If omitted, the current setting is kept;
+		changing ConfigPath does not recalculate an already initialized logging path.
+
+	.INPUTS
+		None. Parameters do not accept pipeline input.
+
+	.OUTPUTS
+		None. Configures paths, a certificate, a scheduled task, and event logging.
+
+	.EXAMPLE
+		PS C:\> Install-SHMigrator -ConfigPath 'C:\SidMigration' -TaskPath 'C:\SidMigration\Scopes.psd1' -LoggingRoot 'C:\SidMigration\Logs'
+
+		Configures the migration host using an existing configuration directory and
+		an explicit log directory. Create the scope data file before running migrations.
+
+	.NOTES
+		Run elevated on Windows. The scheduled task uses Windows PowerShell and SYSTEM,
+		which must be able to load the module, read the configuration, decrypt credentials,
+		and write logs. Scope files and stored secrets should have restricted ACLs.
+		Installation does not create migration task definitions or migrate accounts.
+		This command does not support WhatIf.
+
+	.LINK
+		New-SHTask
+
+	.LINK
+		Invoke-SHMigration
+
+	.LINK
+		about_SidHistoryMigrator
+	#>
 	[CmdletBinding()]
 	param (
 		[Parameter(Mandatory = $true)]

@@ -1,4 +1,46 @@
 ﻿function Get-LdapDomain {
+	<#
+	.SYNOPSIS
+		Builds domain information from LDAP objects and RootDSE.
+
+	.DESCRIPTION
+		Internal helper that combines domainDNS, crossRef, RootDSE, and domain-controller
+		queries into a SidHistoryMigrator.DomainInfo object. Includes domain and forest
+		names, the domain SID, well-known containers, FSMO role holders, and replica servers.
+		ChildDomains and ParentDomain are currently placeholders with null values.
+
+	.PARAMETER Server
+		An optional server for RootDSE and subsequent lookups. The initial domainDNS
+		query currently does not receive this value and uses the default LDAP context.
+
+	.PARAMETER Credential
+		Optional credentials for RootDSE and subsequent lookups. The initial domainDNS
+		query currently uses the calling identity instead of this credential.
+
+	.INPUTS
+		None. Parameters do not accept pipeline input.
+
+	.OUTPUTS
+		System.Management.Automation.PSCustomObject
+		A SidHistoryMigrator.DomainInfo object with domain metadata and controller names.
+
+	.EXAMPLE
+		PS C:\> Get-LdapDomain
+
+		Retrieves metadata for the domain in the current default directory context.
+		This helper is available only within the module's session state.
+
+	.NOTES
+		Not exported. Because the first query uses the default context, do not assume
+		that supplying another domain's server and credentials fully isolates discovery
+		to that domain. Callers must account for this current implementation limitation.
+
+	.LINK
+		Get-LdapRootDSE
+
+	.LINK
+		Resolve-DomainController
+	#>
 	[CmdletBinding()]
 	param (
 		[AllowEmptyString()]
@@ -15,7 +57,7 @@
 		if ($Credential) { $adParam.Credential = $Credential }
 	}
 	process {
-		$domainDNS = Get-LdapObject -LdapFilter '(objectCategory=domainDNS)'
+		$domainDNS = Get-LdapObject @adParam -LdapFilter '(objectCategory=domainDNS)'
 		$rootDSE = Get-LdapRootDSE @adParam
 
 		$ridMaster = Get-LdapObject @adParam -LdapFilter '(objectCategory=*)' -SearchRoot $domainDNS.Ridmanagerreference -SearchScope Base -Property Fsmoroleowner

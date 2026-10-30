@@ -1,61 +1,92 @@
 ﻿function Get-LdapObject {
 	<#
-        .SYNOPSIS
-            Use LDAP to search in Active Directory
+	.SYNOPSIS
+		Searches Active Directory with an LDAP filter.
 
-        .DESCRIPTION
-            Utilizes LDAP to perform swift and efficient LDAP Queries.
+	.DESCRIPTION
+		Internal helper using DirectorySearcher to perform paged LDAP searches. By default,
+		returns PowerShell objects, converts ObjectGuid and ObjectSID to their .NET types,
+		and reduces ObjectClass to its most specific value. Other property values are
+		emitted as returned by the directory. Can return raw SearchResult objects instead.
 
-        .PARAMETER LdapFilter
-            The search filter to use when searching for objects.
-            Must be a valid LDAP filter.
+	.PARAMETER LdapFilter
+		The required LDAP search filter, also accepted at position zero. Values interpolated
+		into filters must already be escaped for LDAP; this helper does not escape them.
 
-        .PARAMETER Property
-            The properties to retrieve.
-            Keep bandwidth in mind and only request what is needed.
+	.PARAMETER Property
+		Attributes to retrieve. Defaults to *, requesting all normal attributes.
+		Alias: Properties. Request only the attributes needed to reduce query cost.
 
-        .PARAMETER SearchRoot
-            The root path to search in.
-            This generally expects either the distinguished name of the Organizational unit or the DNS name of the domain.
-            Alternatively, any legal LDAP protocol address can be specified.
+	.PARAMETER SearchRoot
+		The search base as a distinguished name, domain DNS name, or LDAP path. Defaults
+		to the directory context selected by New-DirectoryEntry. Alias: SearchBase.
+		Cannot be combined with Configuration.
 
-        .PARAMETER Configuration
-            Rather than searching in a specified path, switch to the configuration naming context.
+	.PARAMETER Configuration
+		Searches CN=Configuration beneath the default context selected for the bind
+		instead of an explicit SearchRoot. Uses a separate parameter set.
 
-        .PARAMETER Raw
-            Return the raw AD object without processing it for PowerShell convenience.
+	.PARAMETER Raw
+		Returns System.DirectoryServices.SearchResult objects rather than converted objects.
+		Property conversion, AddProperty, and TypeName are not applied. Use NoMethod as
+		well to avoid adding the helper's ToString script method to raw results.
 
-		.PARAMETER NoMethod
-			Do not add a ToString method to the objects returned.
-			This offers greater convenience but also adds a low per-object performance overhead.
+	.PARAMETER NoMethod
+		Skips adding a ToString script method that returns DistinguishedName or AdsPath.
+		Avoids the per-object Add-Member overhead.
 
-        .PARAMETER PageSize
-            Rather than searching in a specified path, switch to the schema naming context.
+	.PARAMETER PageSize
+		The LDAP query page size, from 1 through 1000. Defaults to 1000. Controls paging,
+		not the total number of results returned.
 
-        .PARAMETER MaxSize
-            The maximum number of items to return.
+	.PARAMETER MaxSize
+		The searcher's total result-size limit when greater than zero. Defaults to zero,
+		which leaves the limit unset; directory server limits still apply. Alias: SizeLimit.
 
-        .PARAMETER SearchScope
-            Whether to search all OUs beneath the target root, only directly beneath it or only the root itself.
-	
-		.PARAMETER AddProperty
-			Add additional properties to the output object.
-			Use to optimize performance, avoiding needing to use Add-Member.
+	.PARAMETER SearchScope
+		Base searches only the root object; OneLevel searches its immediate children;
+		Subtree searches the root and all descendants. Defaults to Subtree.
 
-        .PARAMETER Server
-            The server to contact for this query.
+	.PARAMETER AddProperty
+		A hashtable of additional properties to merge into each converted result. Keys
+		must not collide with properties already in the result. Ignored with Raw.
 
-        .PARAMETER Credential
-            The credentials to use for authenticating this query.
-	
-		.PARAMETER TypeName
-			The name to give the output object
+	.PARAMETER Server
+		The optional LDAP server to contact. If omitted, uses the default directory context.
 
-        .EXAMPLE
-            PS C:\> Get-LdapObject -LdapFilter '(PrimaryGroupID=516)'
-            
-            Searches for all objects with primary group ID 516 (hint: Domain Controllers).
-    #>
+	.PARAMETER Credential
+		Optional credentials for the query. If omitted, uses the calling identity.
+
+	.PARAMETER TypeName
+		An optional PowerShell type name for converted objects. Overrides the default
+		type name derived from ObjectClass. Hidden from normal parameter discovery.
+
+	.INPUTS
+		None. Parameters do not accept pipeline input.
+
+	.OUTPUTS
+		System.Management.Automation.PSCustomObject
+		Converted directory objects by default.
+		System.DirectoryServices.SearchResult
+		Raw directory search results when Raw is enabled.
+
+	.EXAMPLE
+		PS C:\> Get-LdapObject -LdapFilter '(primaryGroupID=516)' -Property DNSHostName
+
+		Retrieves writable domain-controller DNS names within the module's session state.
+
+	.EXAMPLE
+		PS C:\> Get-LdapObject -LdapFilter '(objectCategory=group)' -SearchBase 'OU=Groups,DC=contoso,DC=com' -SearchScope OneLevel -Property SamAccountName
+
+		Searches only the immediate children of the specified OU for groups.
+
+	.NOTES
+		Not exported by the manifest. Defines the internal alias ldap. Uses Windows
+		directory services and does not require the ActiveDirectory PowerShell module.
+
+	.LINK
+		New-DirectoryEntry
+	#>
 	[Alias('ldap')]
 	[CmdletBinding(DefaultParameterSetName = 'SearchRoot')]
 	param (

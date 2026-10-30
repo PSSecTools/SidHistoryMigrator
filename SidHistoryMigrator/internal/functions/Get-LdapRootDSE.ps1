@@ -1,4 +1,42 @@
 ﻿function Get-LdapRootDSE {
+	<#
+	.SYNOPSIS
+		Reads an LDAP server's RootDSE metadata.
+
+	.DESCRIPTION
+		Internal helper that binds to LDAP://RootDSE and returns naming contexts,
+		server identity, supported capabilities, synchronization information, and
+		functional levels. Maps known numeric domain, forest, and controller levels
+		to friendly names, including Windows Server 2025 levels. Unknown levels map
+		to UnknownDomain, UnknownForest, or Unknown respectively.
+
+	.PARAMETER Server
+		An optional LDAP server. If empty or omitted, uses the default directory context.
+
+	.PARAMETER Credential
+		Optional credentials for the bind. If null, uses the calling identity.
+
+	.INPUTS
+		None. Parameters do not accept pipeline input.
+
+	.OUTPUTS
+		System.Management.Automation.PSCustomObject
+		A SidHistoryMigrator.RootDSE object containing the selected RootDSE attributes.
+
+	.EXAMPLE
+		PS C:\> Get-LdapRootDSE -Server 'dc1.contoso.com' -Credential $credential
+
+		Reads RootDSE from the specified controller within the module's session state.
+
+	.NOTES
+		Not exported. Requires Windows directory services and PSFramework's PsfHashtable type.
+
+	.LINK
+		Get-LdapDomain
+
+	.LINK
+		New-DirectoryEntry
+	#>
 	[CmdletBinding()]
 	param (
 		[AllowEmptyString()]

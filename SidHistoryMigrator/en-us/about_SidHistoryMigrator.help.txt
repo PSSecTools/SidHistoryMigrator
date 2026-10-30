@@ -2,10 +2,166 @@
 	about_SidHistoryMigrator
 	
 SHORT DESCRIPTION
-	Explains how to use the SidHistoryMigrator powershell module
+	Explains how to configure and run bulk Active Directory SID history migrations.
 	
 LONG DESCRIPTION
-	<Insert Content here>
+	SidHistoryMigrator matches existing source users and groups to existing
+	destination principals, then uses the Windows DsAddSidHistory API to add the
+	source SID and SID History to the destination principal's sIDHistory attribute. 
+	It does not create destination accounts or migrate passwords, memberships,
+	profiles, or application data. The native API requires domains in different forests.
+
+	SID history changes are security-sensitive. This system stores Domain Admin-equivalent
+	credentials on disk of the machine it is set up on - only use on fully secured and
+	trust computers.
+
+	While the module provides you the commands to execute individual object migrations,
+	it is designed as a configurable solution that runs an a schedule.
+
+	- For individual migrations, see New-SHSession and Copy-SHSidHistory.
+	- For the solution, see Install-SHMigrator and New-SHTask.
+
+CONFIGURATION AND STORAGE
+	SidHistoryMigrator.Path.ConfigRoot
+		Stores Tasks (serialized task definitions) and Secrets (CMS-encrypted
+		credentials). Defaults to PowerShell/SidHistoryMigrator under the
+		PSFramework AppData path for the current identity.
+
+	SidHistoryMigrator.Path.TaskPath
+		Points to the PowerShell data file defining task search scopes and
+		optional logging-provider configuration. Initially empty.
+
+	SidHistoryMigrator.Path.LoggingRoot
+		Stores one JSON action log per task. Initially the logs directory beneath
+		the configuration root. Setting a new ConfigRoot does not recalculate an
+		already initialized LoggingRoot; specify both paths during installation.
+
+	Install-SHMigrator registers path settings at SystemDefault scope, provisions
+	the CN=Sid History Migrator Secrets Manager document-encryption certificate,
+	and registers the Sid History Migrator scheduled task. The task runs
+	Invoke-SHMigration as SYSTEM in Windows PowerShell every three hours.
+	It also initializes the SidHistoryMigration Windows event log.
+
+TYPICAL WORKFLOW
+	1. Prepare an existing configuration directory and choose a scope file path.
+	   From an elevated Windows PowerShell session, configure the host:
+
+	   Install-SHMigrator -ConfigPath 'C:\SidMigration' -TaskPath 'C:\SidMigration\Scopes.psd1' -LoggingRoot 'C:\SidMigration\Logs'
+
+	2. Check selected prerequisites for both domains:
+
+	   $sourceCredential = Get-Credential -UserName 'SOURCE\MigrationAdmin'
+	   $targetCredential = Get-Credential -UserName 'TARGET\MigrationAdmin'
+	   Test-SHDomainController -Server 'source.contoso.com' -Credential $sourceCredential -Type Source
+	   Test-SHDomainController -Server 'target.contoso.com' -Credential $targetCredential -Type Destination
+
+	   Issue objects describe auditing, source migration-group, or direct Domain
+	   Admins membership problems. No issues means only these checks passed, not
+	   that every native API prerequisite has been satisfied. Remoting must work.
+
+	3. Save a task in test mode:
+
+	   New-SHTask -Name 'Pilot' -From 'source.contoso.com' -FromCredential $sourceCredential -To 'target.contoso.com' -ToCredential $targetCredential -TestRun
+
+	   SamAccountName is the default matching attribute for users and groups.
+	   Use FromUserAttribute, ToUserAttribute, FromGroupAttribute, and
+	   ToGroupAttribute to change matching. Source principals with AdminCount
+	   greater than zero are skipped unless AllowAdminCount is enabled.
+
+	4. Create the scope data file described below, using the same task name.
+	   Run the workflow and inspect event messages and Pilot.json:
+
+	   Invoke-SHMigration
+
+	   TestRun performs authentication, searches, matching, and log writes, but
+	   does not write SID history. Pending migrations are recorded as WouldMigrate.
+	   To enable writes, deliberately recreate the task with the intended settings
+	   and credentials, omitting TestRun. Saving an existing name replaces its definition.
+
+SCOPE CONFIGURATION FILE
+	The file selected by TaskPath is a PowerShell data file with a top-level
+	hashtable. A key matching each saved task name contains a Scopes collection:
+
+	@{
+		Pilot = @{
+			Scopes = @(
+				@{
+					Path = 'OU=Pilot,DC=source,DC=contoso,DC=com'
+					Type = 'User'
+					Filter = '(department=Finance)'
+				}
+			)
+		}
+	}
+
+	Path is required and identifies a source search base. Type can select User
+	or Group; if omitted, the search includes both categories. Filter is an
+	optional additional LDAP filter combined with the category selection.
+	Searches use Subtree scope. A SearchScope entry is currently ignored.
+	Attribute values used for destination matching must be safe LDAP filter values;
+	the matching code does not escape them automatically.
+
+	Tasks with missing or empty Scopes are logged and skipped. A top-level Logging
+	entry may contain a PSFramework logging-provider configuration accepted by
+	Set-PSFLoggingProvider -Config. Invoke-SHMigration enables it for the run and
+	disables it afterward. The name Logging is therefore reserved at the top level.
+
+CREDENTIAL MANAGEMENT
+	Export-SHCredential encrypts and saves a PSCredential under a name.
+	Import-SHCredential decrypts and returns it. Remove-SHCredential deletes it.
+	Task creation saves credentials under the exact From and To strings, not
+	the task name. Tasks sharing either value share that saved credential.
+	Replacing or removing one can therefore affect multiple tasks.
+
+	The importing identity, including SYSTEM for scheduled execution, must be
+	able to read the private key for the certificate recorded in the secret.
+	Copying the encrypted files alone to another host is insufficient.
+
+MANUAL OPERATIONS
+	Get-SHTask returns saved task definitions; Name accepts wildcard patterns.
+	Invoke-SHTask executes one definition with an explicit Config hashtable.
+	Neither command accepts task objects through the pipeline.
+
+	New-SHSession creates a native session for Copy-SHSidHistory. Dispose manually
+	created sessions after use to release native bindings and credential handles.
+	Prefer DOMAIN\user credentials for the native parser. Copy-SHSidHistory
+	accepts domain-relative SAM account names and supports WhatIf and Confirm.
+	The native API requires the source session to target the source PDC emulator.
+	WhatIf suppresses the migration write, not earlier session authentication.
+	The task execution commands do not support WhatIf; use a saved TestRun task.
+
+RESULTS AND LOGGING
+	Invoke-SHTask writes results to <TaskName>.json under LoggingRoot rather than
+	returning them. Results include source and destination SAM names and
+	distinguished names, timestamp, status, and a message. Statuses include
+	Migrated, WouldMigrate, NoMatch, Ambiguous, Failed, and Skipped.
+
+	The JSON file is a map keyed by source SAM account name, not an append-only
+	audit trail. Entries already marked Migrated are preserved on subsequent
+	updates. Avoid concurrent runs writing the same task's log.
+
+CURRENT LIMITATIONS
+	Get-LdapDomain begins discovery with a domainDNS query in the calling
+	identity's default LDAP context, without forwarding Server or Credential.
+	Subsequent queries use those parameters. Cross-domain discovery can therefore
+	combine the wrong domain context and target server; validate discovered
+	domain information before using native sessions or prerequisite checks.
+
+	Remove-SHTask -KeepCredentials deletes the definition and preserves secrets.
+	Without KeepCredentials, the current implementation deletes the associated
+	credentials but leaves the definition in place. To remove both with the
+	current implementation, remove credentials first and then remove the
+	definition, after confirming no other tasks need those credentials.
+
+	Test-SHDomainController uses English auditpol category names and output
+	values. It checks selected prerequisites only and is not a full readiness test.
+
+SEE ALSO
+	Install-SHMigrator
+	New-SHTask
+	Invoke-SHMigration
+	Copy-SHSidHistory
+	Test-SHDomainController
 
 KEYWORDS
-	SidHistoryMigrator
+	SidHistoryMigrator, Active Directory, LDAP, SID history, migration

@@ -1,6 +1,8 @@
 ﻿# This is where the strings go, that are written by
 # Write-PSFMessage, Stop-PSFFunction or the PSFramework validation scriptblocks
 @{
+	'Convert-SHAttribute.Error.ConversionFailed'      = 'Faled to convert {0} from {1} to {2}' # $Value, $FromAttribute, $ToAttribute
+	
 	'Copy-SidHistory.Error.Warning'                   = "SId History migration may fail if one of several conditions apply:`n- Accounts used are Domain Admins`n- There is a trust between the domain (source must trust destination)`n- In the source domain there is a group named '<DomainNetBIOSName>`$`$`$'`n- Source and Target DC must have the auditing for 'Account Management' enabled for Success and Failure.`nRun 'Test-SHDomainController' to check the configuration of DC and domain." # 
 	'Copy-SidHistory.Executing'                       = 'Migrating SID History from {0} (in {2}) to {1} (in {3})' # $FromIdentity, $ToIdentity, $From.Domain, $To.Domain
 

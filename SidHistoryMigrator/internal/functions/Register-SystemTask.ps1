@@ -6,13 +6,16 @@
 	.DESCRIPTION
 		Creates a scheduled task running as system.
 		Helper command simplifying setting up simpler scheduled task configurations that run PowerShell as System account.
+		Registers or replaces a task with the same name. The task runs at highest privilege
+		and ignores new invocations while an existing instance is still running.
 	
 	.PARAMETER Name
 		Name of the task to create.
 	
 	.PARAMETER Scriptblock
 		The PowerShell code to execute.
-		Will be executed as encoded command.
+		Executed as a UTF-16 encoded command with NoProfile. Captured local variables
+		are not serialized; the code must be self-contained in the scheduled process.
 	
 	.PARAMETER Description
 		Description to include in the task.
@@ -30,7 +33,7 @@
 	.PARAMETER Limit
 		Maximum duration a task may take before being given up upon by the scheduler.
 		Will run without interruption or limit if set to 0.
-		Defaults to unlimited.
+		Defaults to three days (3d).
 	
 	.PARAMETER UsePWSH
 		Task should run on pwsh.exe / PowerShell 7.
@@ -41,22 +44,34 @@
 		Defaults to localhost.
 	
 	.PARAMETER Credential
-		Credentials to use to set up the task.
+		Credentials to use to set up the task through Invoke-PSFCommand, not credentials
+		for the scheduled process. The scheduled process always runs as SYSTEM.
 
 	.PARAMETER WhatIf
 		If this switch is enabled, no actions are performed but informational messages will be displayed that explain what would happen if the command were to run.
 	
 	.PARAMETER Confirm
 		If this switch is enabled, you will be prompted for confirmation before executing any operations that change state.
+
+	.INPUTS
+		None. Parameters do not accept pipeline input.
+
+	.OUTPUTS
+		None. Registers the scheduled task on the selected computers.
 	
 	.EXAMPLE
-		PS C:\> Register-SystemTask -Name SPSiteDecryptor.Main -Schedule 'Daily-02:00', Boot -ScriptBlock { Invoke-SPSiteDecryption } -Limit '00:00:00' -Confirm:$false -UsePWSH
+		PS C:\> Register-SystemTask -Name 'Sid History Migrator' -Schedule 'Short-03:00' -ScriptBlock { Invoke-SHMigration }
 		
-		Registers the task 'SPSiteDecryptor.Main' on the local computer.
-		- It will run on boot and every day on 2am.
-		- It will execute "Invoke-SPSiteDecryption" when run.
-		- There is no time limit on how long the task may take.
-		- It will run on PowerShell 7.
+		Registers the local migration task to run every three hours using Windows PowerShell.
+		This helper is available only within the module's session state.
+
+	.NOTES
+		Not exported. Requires Windows ScheduledTasks commands and administrative rights
+		on the target computers. The module must be discoverable by the SYSTEM account
+		when the scheduled code invokes its commands.
+
+	.LINK
+		Install-SHMigrator
 	#>
 	[CmdletBinding(SupportsShouldProcess = $true)]
 	param (
@@ -88,6 +103,33 @@
 	)
 	begin {
 		function ConvertTo-TaskSchedule {
+			<#
+			.SYNOPSIS
+				Converts schedule notation into Windows scheduled-task triggers.
+
+			.DESCRIPTION
+				Local helper for Register-SystemTask. Creates startup, daily, or daily
+				triggers with repetition. Throws when a pattern or repetition interval is invalid.
+
+			.PARAMETER Schedule
+				Schedule strings, accepted directly or through the pipeline. Boot runs at
+				startup. Daily optionally includes a PSFDateTime value after a hyphen and
+				defaults to midnight if no time can be parsed. Short requires a PSFTimeSpan
+				interval, such as Short-15m, and repeats within a daily one-day window.
+
+			.INPUTS
+				System.String[]
+				Schedule notation passed through the pipeline.
+
+			.OUTPUTS
+				Microsoft.Management.Infrastructure.CimInstance
+				Scheduled-task trigger objects created by New-ScheduledTaskTrigger.
+
+			.EXAMPLE
+				PS C:\> 'Daily-02:00', 'Boot' | ConvertTo-TaskSchedule
+
+				Creates a daily 02:00 trigger and a startup trigger within the parent scope.
+			#>
 			[CmdletBinding()]
 			param (
 				[Parameter(ValueFromPipeline = $true)]

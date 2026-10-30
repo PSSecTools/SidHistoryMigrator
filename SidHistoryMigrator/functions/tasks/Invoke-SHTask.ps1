@@ -1,4 +1,52 @@
 ﻿function Invoke-SHTask {
+	<#
+	.SYNOPSIS
+		Scans configured source scopes and migrates a saved task's matching principals.
+
+	.DESCRIPTION
+		Loads the task's saved credentials, tests LDAP access to both endpoints, and uses
+		PSFramework runspace workers to search source users and groups and match destination
+		objects using the task's configured attributes. Skips AdminCount-protected principals
+		unless AllowAdminCount is enabled, and avoids copying SID history already present.
+		Records matching failures, migration results, and test-mode outcomes in a JSON action log.
+
+	.PARAMETER Task
+		A single task definition returned by Get-SHTask. This parameter does not accept
+		pipeline input; supply the object explicitly.
+
+	.PARAMETER Config
+		A hashtable containing a Scopes collection. Each scope requires Path (a source
+		distinguished name) and can specify Filter (an LDAP filter) and Type (User or Group).
+		Omitting Type searches both categories. Searches currently use Subtree scope;
+		a SearchScope entry is not applied. Null or empty Scopes cause the task to be skipped.
+
+	.INPUTS
+		None. Parameters do not accept pipeline input.
+
+	.OUTPUTS
+		None. Writes task results through Write-ActionLog rather than returning them.
+
+	.EXAMPLE
+		PS C:\> $task = Get-SHTask -Name 'Pilot'
+		PS C:\> $config = @{ Scopes = @(@{ Path = 'OU=Pilot,DC=source,DC=contoso,DC=com'; Type = 'User' }) }
+		PS C:\> Invoke-SHTask -Task $task -Config $config
+
+		Runs the saved Pilot task for users beneath the source Pilot OU. Use a task
+		saved with TestRun enabled to record WouldMigrate without writing SID history.
+
+	.NOTES
+		Tasks normally run through Invoke-SHMigration, which also configures logging providers.
+		TestRun still performs authentication, directory reads, and JSON log writes. This
+		command has no WhatIf parameter. Worker failures are generally logged per principal
+		or scope rather than returned as output objects. Common result statuses include
+		NoMatch, Ambiguous, Pending, Migrated, WouldMigrate, Failed, and Skipped.
+
+	.LINK
+		Invoke-SHMigration
+
+	.LINK
+		New-SHTask
+	#>
 	[CmdletBinding()]
 	param (
 		$Task,
@@ -18,6 +66,44 @@
 			}
 
 			function Write-Result {
+				<#
+				.SYNOPSIS
+					Queues a principal-matching or migration result.
+
+				.DESCRIPTION
+					Helper local to the task's scan worker. Creates a timestamped record and
+					writes it to a queue in the current PSFramework runspace workflow.
+
+				.PARAMETER FromUser
+					The source LDAP principal, including its SamAccountName.
+
+				.PARAMETER ToUser
+					The matched destination principal, if one was found.
+
+				.PARAMETER ErrorRecord
+					An optional error. Overrides Status with Failed and Message with its text.
+
+				.PARAMETER Status
+					The processing state, such as Pending, Migrated, NoMatch, or Ambiguous.
+
+				.PARAMETER Message
+					Optional explanatory text for the record.
+
+				.PARAMETER Queue
+					The current workflow queue to receive the record. Defaults to ADUsers for
+					migration work; use ActionsTaken for results requiring no migration attempt.
+
+				.INPUTS
+					None. Parameters do not accept pipeline input.
+
+				.OUTPUTS
+					None. Sends an object to the selected workflow queue.
+
+				.EXAMPLE
+					PS C:\> Write-Result -FromUser $principal -Status NoMatch -Message 'No match found' -Queue ActionsTaken
+
+					Queues an unmatched source principal within an active scan worker.
+				#>
 				[CmdletBinding()]
 				param (
 					$FromUser,
@@ -108,9 +194,9 @@
 			foreach ($principal in $principals) {
 				if ($principal.AdminCount -gt 0 -and -not $Task.AllowAdminCount) { continue }
 
-				$toFilter = '(&(objectCategory={0})({1}={2}))' -f $principal.ObjectClass, $toAttribute[$principal.ObjectClass], $principal.$($fromAttribute[$principal.ObjectClass])
 				$targetPrincipal = $null
 				try {
+					$toFilter = '(&(objectCategory={0})({1}={2}))' -f $principal.ObjectClass, $toAttribute[$principal.ObjectClass], (Convert-SHAttribute -Value $principal.$($fromAttribute[$principal.ObjectClass]) -FromAttribute $fromAttribute[$principal.ObjectClass] -ToAttribute $toAttribute[$principal.ObjectClass])
 					$targetPrincipal = Get-LdapObject @toParam -LdapFilter $toFilter -Property $toProperties -ErrorAction Stop
 				}
 				catch {

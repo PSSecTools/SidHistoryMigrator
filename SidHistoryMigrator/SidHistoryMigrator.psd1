@@ -21,7 +21,7 @@
 	Description        = 'migrate SID histories in bulk'
 	
 	# Minimum version of the Windows PowerShell engine required by this module
-	PowerShellVersion  = '5.0'
+	PowerShellVersion  = '5.1'
 	
 	# Modules that must be imported into the global environment prior to importing
 	# this module
@@ -40,8 +40,10 @@
 	
 	# Functions to export from this module
 	FunctionsToExport  = @(
+		'Convert-SHAttribute'
 		'Copy-SHSidHistory'
 		'Export-SHCredential'
+		'Get-SHAttributeConverter'
 		'Get-SHTask'
 		'Import-SHCredential'
 		'Install-SHMigrator'
@@ -49,6 +51,7 @@
 		'Invoke-SHTask'
 		'New-SHSession'
 		'New-SHTask'
+		'Register-SHAttributeConverter'
 		'Remove-SHCredential'
 		'Remove-SHTask'
 		'Test-SHDomainController'
