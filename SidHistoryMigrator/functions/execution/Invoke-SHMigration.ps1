@@ -5,7 +5,7 @@
 		$TaskPath
 	)
 	begin {
-		Set-PSFLoggingProvider -Name eventlog -InstanceName SidHistoryMigrator -Enabled $true -LogName 'SidHistoryMigration' -Source 'SidHistoryMigrator' -Wait
+		Set-PSFLoggingProvider -Name eventlog -InstanceName SidHistoryMigrator -Enabled $true -LogName 'SidHistoryMigration' -Source 'SidHistoryMigrator' -NumericTagAsID $true -Wait
 	}
 	process {
 		$ErrorActionPreference = 'Stop'

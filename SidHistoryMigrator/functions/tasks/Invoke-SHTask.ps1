@@ -11,6 +11,12 @@
 		$code_UserScan = {
 			param ($Scope)
 
+			$ErrorActionPreference = 'Stop'
+			trap {
+				Write-PSFMessage @msgParam -Level Error -String 'Invoke-SHTask.Error.Scope.Unexpected' -StringValues $Scope.Path, "$_" -ErrorRecord $_ -ErrorStack -Tag fail, unexpected, 500
+				return
+			}
+
 			function Write-Result {
 				[CmdletBinding()]
 				param (
@@ -72,7 +78,7 @@
 			else { $filters += '(|(objectCategory=user)(objectCategory=group))' }
 
 			$ldapFilter = '(&{0})' -f ($filters -join '')
-			$properties = 'SamAccountName', 'DistinguishedName', 'ObjectGuid', 'OjectSID', 'sIDHistory', 'AdminCount'
+			$properties = 'SamAccountName', 'DistinguishedName', 'ObjectGuid', 'ObjectSID', 'sIDHistory', 'AdminCount', 'ObjectClass'
 			if ($Task.FromUserAttribute -notin $properties) { $properties += $Task.FromUserAttribute }
 			if ($Task.FromGroupAttribute -notin $properties) { $properties += $Task.FromGroupAttribute }
 			
@@ -81,10 +87,12 @@
 			if ($Task.ToGroupAttribute -notin $toProperties) { $toProperties += $Task.ToGroupAttribute }
 
 			try {
+				Write-PSFMessage @msgParam -String 'Invoke-SHTask.Scope.Searching' -StringValues $Scope.Path, $ldapFilter
 				$principals = Get-LdapObject @fromParam -SearchBase $Scope.Path -LdapFilter $ldapFilter -Property $properties -ErrorAction Stop
+				Write-PSFMessage @msgParam -String 'Invoke-SHTask.Scope.Found' -StringValues @($principals).Count
 			}
 			catch {
-				Write-PSFMessage @msgParam -Level Error -Tag config -String 'Invoke-SHTask.Error.Scope.ErrorRetrieving' -Target $Scope -ErrorRecord $_
+				Write-PSFMessage @msgParam -Level Error -Tag config -String 'Invoke-SHTask.Error.Scope.ErrorRetrieving' -StringValues $Scope.Path, $ldapFilter -Target $Scope -ErrorRecord $_
 				return
 			}
 
@@ -100,25 +108,25 @@
 			foreach ($principal in $principals) {
 				if ($principal.AdminCount -gt 0 -and -not $Task.AllowAdminCount) { continue }
 
-				$toFilter = '(&(objectCategory={0})({1}={2}))' -f $principal.ObjectCategory, $toAttribute[$principal.ObjectCategory], $principal.$($fromAttribute[$principal.ObjectCategory])
+				$toFilter = '(&(objectCategory={0})({1}={2}))' -f $principal.ObjectClass, $toAttribute[$principal.ObjectClass], $principal.$($fromAttribute[$principal.ObjectClass])
 				$targetPrincipal = $null
 				try {
 					$targetPrincipal = Get-LdapObject @toParam -LdapFilter $toFilter -Property $toProperties -ErrorAction Stop
 				}
 				catch {
-					Write-PSFMessage @msgParam -Level Error -String 'Invoke-SHTask.Error.Query' -StringValues $principal.SamAccountName, $principal.ObjectCategory, $toFilter -Target $principal -ErrorRecord $_
+					Write-PSFMessage @msgParam -Level Error -String 'Invoke-SHTask.Error.Query' -StringValues $principal.SamAccountName, $principal.ObjectClass, $toFilter -Target $principal -ErrorRecord $_
 					Write-Result -FromUser $principal -ErrorRecord $_ -Queue ActionsTaken
 					continue
 				}
 
 				if (-not $targetPrincipal) {
-					Write-PSFMessage @msgParam -Level Error -String 'Invoke-SHTask.Warning.NoMatch' -StringValues $principal.SamAccountName, $principal.$($fromAttribute[$principal.ObjectCategory]), $toAttribute[$principal.ObjectCategory] -Target $principal
+					Write-PSFMessage @msgParam -Level Error -String 'Invoke-SHTask.Warning.NoMatch' -StringValues $principal.SamAccountName, $principal.$($fromAttribute[$principal.ObjectClass]), $toAttribute[$principal.ObjectClass] -Target $principal
 					Write-Result -FromUser $principal -Status 'NoMatch' -Message 'No match found' -Queue ActionsTaken
 					continue
 				}
 
 				if (@($targetPrincipal).Count -gt 1) {
-					Write-PSFMessage @msgParam -Level Error -String 'Invoke-SHTask.Warning.AmbiguousMatch' -StringValues $principal.SamAccountName, $principal.$($fromAttribute[$principal.ObjectCategory]), $toAttribute[$principal.ObjectCategory], ($targetPrincipal.SamAccountName -join ',') -Target $principal
+					Write-PSFMessage @msgParam -Level Error -String 'Invoke-SHTask.Warning.AmbiguousMatch' -StringValues $principal.SamAccountName, $principal.$($fromAttribute[$principal.ObjectClass]), $toAttribute[$principal.ObjectClass], ($targetPrincipal.SamAccountName -join ',') -Target $principal
 					Write-Result -FromUser $principal -Status 'Ambiguous' -Message "Multiple Matches: $($targetPrincipal.SamAccountName -join ',')" -Queue ActionsTaken
 					continue
 				}
@@ -142,6 +150,9 @@
 		$code_Migrator = {
 			param ($Principal)
 
+			# Since we're writing directly to the queue, there's an empty entry at the end of each Scope search
+			if (-not $Principal) { return }
+
 			if (-not $global:FromSession -or -not $global:ToSession) {
 				$Principal.Status = 'Skipped'
 				$Principal.Message = 'Authentication Failed'
@@ -150,12 +161,13 @@
 
 			try {
 				if ($Task.TestRun) {
-					Write-PSFMessage @msgParam -String 'Invoke-SHTask.Executing.TestRun' -StringValues $Principal.From, $Principal.To
+					Write-PSFMessage @msgParam -String 'Invoke-SHTask.Executing.TestRun' -StringValues $Principal.From, $Principal.To -Target $Principal
+					$Principal.Status = 'WouldMigrate'
 				}
 				else {
 					Copy-SHSidHistory -From $global:FromSession -To $global:ToSession -FromIdentity $Principal.From -ToIdentity $Principal.To
+					$Principal.Status = 'Migrated'
 				}
-				$Principal.Status = 'Migrated'
 				$Principal.Timestamp = Get-Date
 			}
 			catch {
@@ -174,7 +186,7 @@
 				Write-PSFMessage @msgParam -Level Error -String 'Invoke-SHTask.Error.AuthenticationFailed' -StringValues $Task.From -ErrorRecord $_
 			}
 			try {
-				$global:ToSession = New-SHSession -Server $Task.To -Credential $ToSession
+				$global:ToSession = New-SHSession -Server $Task.To -Credential $ToCredential
 			}
 			catch {
 				$global:ToSession = $null
@@ -228,15 +240,15 @@
 		## Prepare Worker: AD Benutzer Scan
 		$scanCount = 5
 		if (@($Config.Scopes).Count -lt 5) { $scanCount = @($Config.Scopes).Count }
-		$workflow | Add-PSFRunspaceWorker -Name 'User Scan' -Count $scanCount -InQueue Scopes -OutQueue ADUsers @workerEnv -ScriptBlock $code_UserScan -CloseOutQueue
+		$null = $workflow | Add-PSFRunspaceWorker -Name 'User Scan' -Count $scanCount -InQueue Scopes -OutQueue ADUsers @workerEnv -ScriptBlock $code_UserScan -CloseOutQueue
 		## Prepare Worker: Migrator
-		$workflow | Add-PSFRunspaceWorker -Name 'Migrator' -Count 5 -InQueue ADUsers -OutQueue ActionsTaken @workerEnv -ScriptBlock $code_Migrator -Begin $code_Migrator_Begin -CloseOutQueue
+		$null = $workflow | Add-PSFRunspaceWorker -Name 'Migrator' -Count 5 -InQueue ADUsers -OutQueue ActionsTaken @workerEnv -ScriptBlock $code_Migrator -Begin $code_Migrator_Begin -CloseOutQueue
 		## Load Scope Selectors from Configuration and Start workflow
 		$workflow | Write-PSFRunspaceQueue -Name Scopes -BulkValues $Config.Scopes -Close
 		$workflow | Start-PSFRunspaceWorkflow
 
 		# Wait for Completion
-		$workflow | Wait-PSFRunspaceWorkflow
+		$workflow | Wait-PSFRunspaceWorkflow -Queue ActionsTaken
 		$results = Read-PSFRunspaceQueue -InputObject $workflow -Name ActionsTaken -All
 		$workflow | Remove-PSFRunspaceWorkflow
 

@@ -2,6 +2,8 @@
 	[CmdletBinding()]
 	param (
 		[Parameter(Mandatory = $true)]
+		[AllowEmptyCollection()]
+		[AllowNull()]
 		$Data,
 
 		[Parameter(Mandatory = $true)]
@@ -20,6 +22,8 @@
 		if (Test-Path -Path $logFile) { $config = Import-PSFJson -Path $logFile -AsHashtable }
 
 		foreach ($entry in $Data) {
+			# Workers that write directly to queues might lead to null-entries
+			if (-not $entry) { continue }
 			if ($config[$entry.From].Status -eq 'Migrated') { continue }
 			$config[$entry.From] = @{
 				FromSAM   = $entry.From

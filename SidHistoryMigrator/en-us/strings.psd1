@@ -21,9 +21,11 @@
 
 	'Invoke-SHTask.Error.AuthenticationFailed'        = 'Failed to authenticate to {0}' # $Task.From
 	'Invoke-SHTask.Error.Query'                       = 'Error retrieving matching principals for {1} {0} | Filter: {2}' # $principal.SamAccountName, $principal.ObjectCategory, $toFilter
-	'Invoke-SHTask.Error.Scope.ErrorRetrieving'       = 'Error searching for principals in source. Ensure the scope configuration is correct (e.g. the specified path exists)' # 
+	'Invoke-SHTask.Error.Scope.ErrorRetrieving'       = 'Error searching for principals in source under "{0}" with filter "{1}". Ensure the scope configuration is correct (e.g. the specified path exists)' # $Scope.Path, $ldapFilter
 	'Invoke-SHTask.Error.Scope.NoPath'                = 'Invalid scope configuration: No Path (OU) specified!' # 
 	'Invoke-SHTask.Executing.TestRun'                 = '[No Action] Would have migrated SID History from {0} to {1}' # $Principal.From, $Principal.To
+	'Invoke-SHTask.Scope.Found'                       = 'Found {0} principals in the specified scope (before excluding AdminCount entities)' # @($principals).Count
+	'Invoke-SHTask.Scope.Searching'                   = 'Searching for principals under "{0}" with filter "{1}"' # $Scope.Path, $ldapFilter
 	'Invoke-SHTask.Task.BadCredential'                = 'Error validating task {0}: Domain Credentials provided for {1} are invalid.' # $Task.Name, $Task.From
 	'Invoke-SHTask.Task.Credentials'                  = 'Failed to retrieve credentials for task {0}' # $Task.Name
 	'Invoke-SHTask.Task.NoConfig'                     = 'No configuration provided for task {0}. Skipping.' # $Task.Name

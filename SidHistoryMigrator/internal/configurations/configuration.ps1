@@ -16,5 +16,5 @@ Set-PSFConfig -Module 'SidHistoryMigrator' -Name 'Import.IndividualFiles' -Value
 
 $configRoot = Join-Path -Path (Get-PSFPath -Name AppData) -ChildPath 'PowerShell/SidHistoryMigrator'
 Set-PSFConfig -Module SidHistoryMigrator -Name 'Path.ConfigRoot' -Value $configRoot -Initialize -Validation string -Description 'Path where the module tracks its operations.'
-Set-PSFConfig -Module SidHistoryMigrator -Name 'Path.LoggingRoot' -Value (Join-Path $configRoot 'logs') -Initialize -Validation string -Description 'Path where the module logs the changes it performs.'
+Set-PSFConfig -Module SidHistoryMigrator -Name 'Path.LoggingRoot' -Value (Join-Path (Get-PSFConfigValue -FullName 'SidHistoryMigrator.Path.ConfigRoot') 'logs') -Initialize -Validation string -Description 'Path where the module logs the changes it performs.'
 Set-PSFConfig -Module SidHistoryMigrator -Name 'Path.TaskPath' -Value '' -Initialize -Validation string -Description 'Path to the file that contains the config file, mapping which users for which task should be migrated.'
