@@ -9,19 +9,19 @@ namespace SidHistoryMigrator
 {
     public static class Native
     {
-        [DllImport("Ntdsapi.dll", SetLastError = true)]
+        [DllImport("Ntdsapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern int DsBind(
             string DomainControllerName,
             string DnsDomainName,
             out IntPtr Connection
         );
 
-        [DllImport("Ntdsapi.dll", SetLastError = true)]
+        [DllImport("Ntdsapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern int DsUnBind(
             IntPtr Connection
         );
 
-        [DllImport("Ntdsapi.dll", SetLastError = true)]
+        [DllImport("Ntdsapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern int DsBindWithCred(
             string DomainControllerName,
             string DnsDomainName,
@@ -29,7 +29,7 @@ namespace SidHistoryMigrator
             out IntPtr Connection
         );
 
-        [DllImport("Ntdsapi.dll", SetLastError = true)]
+        [DllImport("Ntdsapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern int DsMakePasswordCredentials(
             string User,
             string Domain,
@@ -37,12 +37,12 @@ namespace SidHistoryMigrator
             out IntPtr AuthHandle
         );
 
-        [DllImport("Ntdsapi.dll", SetLastError = true)]
+        [DllImport("Ntdsapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern int DsFreePasswordCredentials(
             IntPtr AuthHandle
         );
 
-        [DllImport("Ntdsapi.dll", SetLastError = true)]
+        [DllImport("Ntdsapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         public static extern int DsAddSidHistory(
             IntPtr SessionHandle,
             uint Flags,
