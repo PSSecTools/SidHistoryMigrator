@@ -230,6 +230,7 @@
 					'ObjectClass' { $ldapobject.Properties[$key][@($ldapobject.Properties[$key]).Count - 1] }
 					'ObjectGuid' { [guid]::new(([byte[]]($($ldapobject.Properties[$key])))) }
 					'ObjectSID' { [System.Security.Principal.SecurityIdentifier]::new(([byte[]]($($ldapobject.Properties[$key]))), 0) }
+					'sIDHistory' { foreach ($sidBytes in $ldapobject.Properties[$key]) { [System.Security.Principal.SecurityIdentifier]::new(([byte[]]$sidBytes), 0) } }
 						
 					default { $($ldapobject.Properties[$key]) }
 				}
