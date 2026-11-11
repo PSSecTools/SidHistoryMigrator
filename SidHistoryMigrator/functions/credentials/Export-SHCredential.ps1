@@ -4,39 +4,25 @@
 		Encrypts and saves a named migration credential.
 
 	.DESCRIPTION
-		Encrypts the user name and password with the CMS document-encryption certificate
-		CN=Sid History Migrator Secrets Manager. Saves the certificate thumbprint and
-		encrypted values in the Secrets directory beneath SidHistoryMigrator.Path.ConfigRoot.
-		Saving an existing name replaces its stored credential.
+		Encrypts and saves a named migration credential.
+		Expects the module to have been properly installed through the "Install-SHMigrator" command:
+
+		- Encrypted Credentials are written to a "Secrets" folder under the ConfigPath specified during installation.
+		- Encryption is performed with the latest certificate with the subject "CN=Sid History Migrator Secrets Manager" that it can find with a private key for.
+		
+		If a secret of the specified name already exists, it will be overwritten without prompt.
 
 	.PARAMETER Name
-		The name used to retrieve or remove the credential. Migration tasks use their
-		From and To server or domain strings as credential names.
+		The name under which the certificate will be stored (and later retrieved).
+		Migration Tasks store their credentials under the domain/server name specified during task creation, and thus read th secrets using that respective name.
 
 	.PARAMETER Credential
 		The credential to encrypt and save.
 
-	.INPUTS
-		None. Parameters do not accept pipeline input.
-
-	.OUTPUTS
-		None. Writes an encrypted credential file.
-
 	.EXAMPLE
-		PS C:\> Export-SHCredential -Name 'source.contoso.com' -Credential (Get-Credential)
+		PS C:\> Export-SHCredential -Name 'contoso.com' -Credential (Get-Credential)
 
-		Prompts for a credential and saves it under the source domain name.
-
-	.NOTES
-		Run Install-SHMigrator first to provision the encryption certificate. The identity
-		that later imports the credential needs access to its private key. Credentials
-		are shared by name across tasks; replacing one affects every task using that name.
-
-	.LINK
-		Import-SHCredential
-
-	.LINK
-		Remove-SHCredential
+		Prompts for a credential and saves it under the specified domain name.
 	#>
 	[CmdletBinding()]
 	param (

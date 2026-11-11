@@ -4,33 +4,19 @@
 		Loads and decrypts a saved migration credential.
 
 	.DESCRIPTION
-		Reads the named credential from the Secrets directory beneath
-		SidHistoryMigrator.Path.ConfigRoot, resolves its certificate by the saved
-		thumbprint, and decrypts the user name and password into a PSCredential.
-		Reports a terminating error if the file or certificate cannot be found.
+		Loads and decrypts a saved migration credential.
+		This command can fail with a terminating error if the secret specified does not exist or the certificate it was encrypted with is unavailable.
+		It will also fail, if the current account does not have access rights to the private key.
+		If you run this task under an account who does not have local admin rights, ensure you assign read permissions on the private key (e.g. through the certificates mmc console).
 
 	.PARAMETER Name
-		The exact name supplied to Export-SHCredential. Migration tasks use their
-		From and To values as credential names. Wildcards are not supported.
-
-	.INPUTS
-		None. Parameters do not accept pipeline input.
-
-	.OUTPUTS
-		System.Management.Automation.PSCredential
-		The decrypted credential.
+		Name of the credential to retrieve.
+		In this system, that is generally the domain name of the target domain as specified during Migration Task creation.
 
 	.EXAMPLE
-		PS C:\> $credential = Import-SHCredential -Name 'source.contoso.com'
+		PS C:\> $credential = Import-SHCredential -Name 'contoso.com'
 
-		Loads the saved source-domain credential for subsequent directory operations.
-
-	.NOTES
-		The calling identity needs access to the private key of the certificate used
-		when the credential was exported. Do not write the decrypted password to logs.
-
-	.LINK
-		Export-SHCredential
+		Loads the saved credential for the "contoso.com" domain.
 	#>
 	[OutputType([PSCredential])]
 	[CmdletBinding()]
@@ -46,7 +32,7 @@
 		}
 	}
 	process {
-		$filename = "$([convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Name)).Trim("=")).psd1"
+		$filename = "$([convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Name)).Trim('=')).psd1"
 		$filePath = Join-Path -Path $secretPath -ChildPath $filename
 
 		if (-not (Test-Path -Path $filePath)) {

@@ -1,9 +1,9 @@
 ﻿# This is where the strings go, that are written by
 # Write-PSFMessage, Stop-PSFFunction or the PSFramework validation scriptblocks
 @{
-	'Convert-SHAttribute.Error.ConversionFailed'      = 'Faled to convert {0} from {1} to {2}' # $Value, $FromAttribute, $ToAttribute
-	
-	'Copy-SidHistory.Error.Warning'                   = "SId History migration may fail if one of several conditions apply:`n- Accounts used are Domain Admins`n- There is a trust between the domain (source must trust destination)`n- In the source domain there is a group named '<DomainNetBIOSName>`$`$`$'`n- Source and Target DC must have the auditing for 'Account Management' enabled for Success and Failure.`nRun 'Test-SHDomainController' to check the configuration of DC and domain." # 
+	'Convert-SHAttribute.Error.ConversionFailed'      = 'Failed to convert {0} from {1} to {2}' # $Value, $FromAttribute, $ToAttribute
+
+	'Copy-SidHistory.Error.Warning'                   = "Sid History migration may fail if one of several conditions apply:`n- Accounts used are Domain Admins`n- There is a trust between the domain (source must trust destination)`n- In the source domain there is a group named '<DomainNetBIOSName>`$`$`$'`n- Source and Target DC must have the auditing for 'Account Management' enabled for Success and Failure.`nRun 'Test-SHDomainController' to check the configuration of DC and domain." # 
 	'Copy-SidHistory.Executing'                       = 'Migrating SID History from {0} (in {2}) to {1} (in {3})' # $FromIdentity, $ToIdentity, $From.Domain, $To.Domain
 
 	'Import-SHCredential.Error.CertificateNotFound'   = 'The certificate needed to decrypt/access the secret {0} was not found: {1}' # $Name, $data.Thumbprint
@@ -34,6 +34,8 @@
 	'Invoke-SHTask.Task.Starting'                     = 'Starting to process task {0}' # $Task.Name
 	'Invoke-SHTask.Warning.AmbiguousMatch'            = 'Principal {0} with {2} "{1}" resolves to more than one principal: {3}. Refusing to migrate in an ambiguous situation.' # $principal.SamAccountName, $principal.$($fromAttribute[$principal.ObjectCategory]), $toAttribute[$principal.ObjectCategory], ($targetPrincipal.SamAccountName -join ',')
 	'Invoke-SHTask.Warning.NoMatch'                   = 'Principal {0} with {2} "{1}" does not resolve to a principal in the destination domain!' # $principal.SamAccountName, $principal.$($fromAttribute[$principal.ObjectCategory]), $toAttribute[$principal.ObjectCategory]
+
+	'New-SHTask.Error.InvalidName.Logging'            = 'Invalid Task Name: The name "Logging" has been reserved and cannot be used for a task name.' #
 
 	'Resolve-TaskConfiguration.Error.FailedToLoad'    = 'Failed to load task configuration from {0}' # $effectivePath
 	'Resolve-TaskConfiguration.Error.NoPathSpecified' = 'No task configuration specified!' # 

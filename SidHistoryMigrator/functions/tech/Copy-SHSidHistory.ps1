@@ -4,11 +4,9 @@
 		Copies a source principal's SID history to a destination principal.
 
 	.DESCRIPTION
-		Calls the native DsAddSidHistory API through the module's DirectoryTools class,
-		using authenticated sessions for domains in different forests. Adds the source
-		principal's SID, and its SID history for native-mode source domains, to an existing
-		destination principal; it does not create accounts.
-		Native migration failures are reported as terminating errors.
+		Copies a source principal's SID history to a destination principal.	
+		Several prerequisites must be met for this to succeed, for details see:
+		Get-Help about_SidHistoryMigrator
 
 	.PARAMETER From
 		An authenticated source-domain DSSession created by New-SHSession.
@@ -24,36 +22,18 @@
 		Defaults to FromIdentity when omitted or empty.
 
 	.PARAMETER WhatIf
-		Shows the intended SID history operation without calling the native migration API.
-
+		If this switch is enabled, no actions are performed but informational messages will be displayed that explain what would happen if the command were to run.
+	
 	.PARAMETER Confirm
-		Requests confirmation before calling the native migration API.
-
-	.INPUTS
-		None. Parameters do not accept pipeline input.
-
-	.OUTPUTS
-		None.
+		If this switch is enabled, you will be prompted for confirmation before executing any operations that change state.
 
 	.EXAMPLE
-		PS C:\> $source = New-SHSession -Server 'source.contoso.com' -Credential (Get-Credential)
-		PS C:\> $target = New-SHSession -Server 'target.contoso.com' -Credential (Get-Credential)
-		PS C:\> try { Copy-SHSidHistory -From $source -To $target -FromIdentity 'alice' -ToIdentity 'alice.new' -WhatIf } finally { $source.Dispose(); $target.Dispose() }
+		PS C:\> $source = New-SHSession -Server 'contoso.com' -Credential (Get-Credential)
+		PS C:\> $target = New-SHSession -Server 'fabrikam.org' -Credential (Get-Credential)
+		PS C:\> try { Copy-SHSidHistory -From $source -To $target -FromIdentity 'alice' -ToIdentity 'alice.new' } finally { $source.Dispose(); $target.Dispose() }
 
-		Authenticates to both domains and previews copying alice's SID history to alice.new.
-		Disposes both sessions afterward. Remove WhatIf only when ready to perform the write.
-
-	.NOTES
-		Requires Windows and the native SID history migration prerequisites in both domains.
-		The native API requires the source session to target the source PDC emulator.
-		WhatIf suppresses the migration write, not session creation or authentication.
-		Test-SHDomainController checks selected prerequisites but is not exhaustive.
-
-	.LINK
-		New-SHSession
-
-	.LINK
-		Test-SHDomainController
+		Authenticates to both domains and copyies alice's SID history to alice.new.
+		Disposes both sessions afterward.
 
 	.LINK
 		https://learn.microsoft.com/en-us/windows/win32/api/ntdsapi/nf-ntdsapi-dsaddsidhistoryw

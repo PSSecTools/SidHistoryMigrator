@@ -1,61 +1,68 @@
 ﻿function Invoke-SHTask {
 	<#
 	.SYNOPSIS
-		Scans configured source scopes and migrates a saved task's matching principals.
+		Executes the actual SID History Migration.
 
 	.DESCRIPTION
-		Loads the task's saved credentials, tests LDAP access to both endpoints, and uses
-		PSFramework runspace workers to search source users and groups and match destination
-		objects using the task's configured attributes. Skips AdminCount-protected principals
-		unless AllowAdminCount is enabled, and avoids copying SID history already present.
-		Records matching failures, migration results, and test-mode outcomes in a JSON action log.
+		Executes the actual SID History Migration.
+		This takes two pieces of information:
+		
+		+ The task definition itself, as returned by Get-SHTask
+		+ A configuration hashtable describing the principals in scope
+
+		The task definition describes the core scope and guardrails of the migration, including the domains involved, whether to migrate sensitive accounts, or whether to do just a test run.
+		It also determines which attributes from the source domain's principal match to which attributes from the destination domain's principals to determine the migration targets.
+		
+		The configuration hashtable determines, where in the source domain to look for Principals to migrate.
 
 	.PARAMETER Task
-		A single task definition returned by Get-SHTask. This parameter does not accept
-		pipeline input; supply the object explicitly.
+		A single task object, as returned by Get-SHTask.
 
 	.PARAMETER Config
-		A hashtable containing a Scopes collection. Each scope requires Path (a source
-		distinguished name) and can specify Filter (an LDAP filter) and Type (User or Group).
-		Omitting Type searches both categories. Searches currently use Subtree scope;
-		a SearchScope entry is not applied. Null or empty Scopes cause the task to be skipped.
+		The configuration that determines, what principals are in scope for the migration.
+		The hashtable is structured like this:
+		@{
+			Scopes = <hashtable[]>
+		}
+		
+		Each scope can define multiple settings. Scope structure:
+		@{
+			Path = '<distinguishedName>' # Mandatory. DN of Organizational Unit under which to look for principals
+			Filter = '<ldap filter>' # Optional. An LDAP Filter to further limit the principals under the defined path
+			Type = '<User|Group>' # Optional. Limit Principals to either Group or User
+			SearchScope = '<Subtree|Base|OneLevel>' # Optional. Defines how deeply nested the LDAP search for Principals will delve under the defined path.
+		}
+		
+		Example:
+		@{
+			Scopes = @(
+				@{ Path = 'OU=USA,OU=Accounts,DC=Contoso,DC=com' }
+				@{ Path = 'OU=Brazil,OU=Accounts,DC=Contoso,DC=com'; Type = 'User' }
+				@{ Path = 'OU=Japan,OU=Accounts,DC=Contoso,DC=com'; Filter = '(|(department=Research)(department=Development))' }
+			)
+		}
 
-	.INPUTS
-		None. Parameters do not accept pipeline input.
-
-	.OUTPUTS
-		None. Writes task results through Write-ActionLog rather than returning them.
+		If no scopes are defined, the command will end without performing an action.
 
 	.EXAMPLE
 		PS C:\> $task = Get-SHTask -Name 'Pilot'
-		PS C:\> $config = @{ Scopes = @(@{ Path = 'OU=Pilot,DC=source,DC=contoso,DC=com'; Type = 'User' }) }
+		PS C:\> $config = @{ Scopes = @(@{ Path = 'OU=Pilot,DC=contoso,DC=com'; Type = 'User' }) }
 		PS C:\> Invoke-SHTask -Task $task -Config $config
 
-		Runs the saved Pilot task for users beneath the source Pilot OU. Use a task
-		saved with TestRun enabled to record WouldMigrate without writing SID history.
-
-	.NOTES
-		Tasks normally run through Invoke-SHMigration, which also configures logging providers.
-		TestRun still performs authentication, directory reads, and JSON log writes. This
-		command has no WhatIf parameter. Worker failures are generally logged per principal
-		or scope rather than returned as output objects. Common result statuses include
-		NoMatch, Ambiguous, Pending, Migrated, WouldMigrate, Failed, and Skipped.
-
-	.LINK
-		Invoke-SHMigration
-
-	.LINK
-		New-SHTask
+		Runs the Pilot task for all users beneath the source Pilot OU.
 	#>
 	[CmdletBinding()]
 	param (
+		[Parameter(Mandatory = $true)]
 		$Task,
 
+		[Parameter(Mandatory = $true)]
 		[AllowNull()]
 		[hashtable]
 		$Config
 	)
 	begin {
+		#region Worker Code
 		$code_UserScan = {
 			param ($Scope)
 
@@ -66,44 +73,6 @@
 			}
 
 			function Write-Result {
-				<#
-				.SYNOPSIS
-					Queues a principal-matching or migration result.
-
-				.DESCRIPTION
-					Helper local to the task's scan worker. Creates a timestamped record and
-					writes it to a queue in the current PSFramework runspace workflow.
-
-				.PARAMETER FromUser
-					The source LDAP principal, including its SamAccountName.
-
-				.PARAMETER ToUser
-					The matched destination principal, if one was found.
-
-				.PARAMETER ErrorRecord
-					An optional error. Overrides Status with Failed and Message with its text.
-
-				.PARAMETER Status
-					The processing state, such as Pending, Migrated, NoMatch, or Ambiguous.
-
-				.PARAMETER Message
-					Optional explanatory text for the record.
-
-				.PARAMETER Queue
-					The current workflow queue to receive the record. Defaults to ADUsers for
-					migration work; use ActionsTaken for results requiring no migration attempt.
-
-				.INPUTS
-					None. Parameters do not accept pipeline input.
-
-				.OUTPUTS
-					None. Sends an object to the selected workflow queue.
-
-				.EXAMPLE
-					PS C:\> Write-Result -FromUser $principal -Status NoMatch -Message 'No match found' -Queue ActionsTaken
-
-					Queues an unmatched source principal within an active scan worker.
-				#>
 				[CmdletBinding()]
 				param (
 					$FromUser,
@@ -157,7 +126,7 @@
 				Credential = $ToCredential
 			}
 			
-			$filters = @()
+			$filters = @('(objectSID=*)')
 			if ($Scope.Filter) { $filters += $Scope.Filter }
 			if ($Scope.Type -eq 'User') { $filters += '(objectCategory=user)' }
 			elseif ($Scope.Type -eq 'Group') { $filters += '(objectCategory=group)' }
@@ -279,6 +248,7 @@
 				Write-PSFMessage @msgParam -Level Error -String 'Invoke-SHTask.Error.AuthenticationFailed' -StringValues $Task.To -ErrorRecord $_
 			}
 		}
+		#endregion Worker Code
 	}
 	process {
 		Write-PSFMessage -Level Host -String 'Invoke-SHTask.Task.Starting' -StringValues $Task.Name -Target $Task
@@ -323,12 +293,13 @@
 		# Prepare Workflow
 		$workflow = New-PSFRunspaceWorkflow -Name 'SidMigration_Executor' -Force
 
-		## Prepare Worker: AD Benutzer Scan
-		$scanCount = 5
-		if (@($Config.Scopes).Count -lt 5) { $scanCount = @($Config.Scopes).Count }
+		## Prepare Worker: AD Principal Scan
+		$scanCount = Get-PSFConfigValue -FullName 'SidHistoryMigrator.Execution.ScanThrottleLimit' -Fallback 5
+		$migratorCount = Get-PSFConfigValue -FullName 'SidHistoryMigrator.Execution.MigrationThrottleLimit' -Fallback 5
+		if (@($Config.Scopes).Count -lt $scanCount) { $scanCount = @($Config.Scopes).Count }
 		$null = $workflow | Add-PSFRunspaceWorker -Name 'User Scan' -Count $scanCount -InQueue Scopes -OutQueue ADUsers @workerEnv -ScriptBlock $code_UserScan -CloseOutQueue
 		## Prepare Worker: Migrator
-		$null = $workflow | Add-PSFRunspaceWorker -Name 'Migrator' -Count 5 -InQueue ADUsers -OutQueue ActionsTaken @workerEnv -ScriptBlock $code_Migrator -Begin $code_Migrator_Begin -CloseOutQueue
+		$null = $workflow | Add-PSFRunspaceWorker -Name 'Migrator' -Count $migratorCount -InQueue ADUsers -OutQueue ActionsTaken @workerEnv -ScriptBlock $code_Migrator -Begin $code_Migrator_Begin -CloseOutQueue
 		## Load Scope Selectors from Configuration and Start workflow
 		$workflow | Write-PSFRunspaceQueue -Name Scopes -BulkValues $Config.Scopes -Close
 		$workflow | Start-PSFRunspaceWorkflow

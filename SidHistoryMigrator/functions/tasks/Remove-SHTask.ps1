@@ -1,45 +1,37 @@
 ﻿function Remove-SHTask {
 	<#
 	.SYNOPSIS
-		Removes task data or its associated saved credentials.
+		Removes previously registered SID History migration tasks.
 
 	.DESCRIPTION
-		Locates a saved task by its exact name. With KeepCredentials, deletes only
-		the task definition. Without KeepCredentials, the current implementation deletes
-		the task's source and destination credentials but leaves the task definition in place.
-		Does nothing if the task definition does not exist.
+		Removes previously registered SID History migration tasks.
+		Use this to conclude a migration project.
+
+		Optionally choose whether to retain the credentials used in this task,
+		something that might be necessary when multiple tasks operate against the same domain, as the credentials are shared.
+
+		If you later need to remove credentials manually, use the Remove-SHCredential command.
 
 	.PARAMETER Name
-		The exact name of the saved task. Wildcards are not supported.
+		Name of the task to remove.
 
 	.PARAMETER KeepCredentials
-		Deletes the task definition without deleting its saved credentials.
+		Deletes the task without deleting its saved credentials.
+		Necessary when other tasks operate still use the credentials.
 
-	.INPUTS
-		None. Parameters do not accept pipeline input.
+	.EXAMPLE
+		PS C:\> Remove-SHTask -Name 'Pilot'
 
-	.OUTPUTS
-		None.
+		Deletes the Pilot task.
 
 	.EXAMPLE
 		PS C:\> Remove-SHTask -Name 'Pilot' -KeepCredentials
 
-		Deletes the Pilot task definition while preserving shared domain credentials.
-
-	.NOTES
-		Without KeepCredentials, the task definition currently remains on disk.
-		Credentials are shared by domain or server name, so deleting them can affect
-		other tasks. This command does not prompt for confirmation or support WhatIf.
-
-	.LINK
-		Get-SHTask
-
-	.LINK
-		Remove-SHCredential
+		Deletes the Pilot task while preserving shared domain credentials.
 	#>
 	[CmdletBinding()]
 	param (
-		[Parameter(Mandatory = $true)]
+		[Parameter(Mandatory = $true, ValueFromPipeline = $true, ValueFromPipelineByPropertyName = $true)]
 		[string]
 		$Name,
 
@@ -53,7 +45,7 @@
 		}
 	}
 	process {
-		$filename = "$([convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Name)).Trim("=")).clidat"
+		$filename = "$([convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Name)).Trim('=')).clidat"
 		$filePath = Join-Path -Path $taskPath -ChildPath $filename
 
 		if (-not (Test-Path -LiteralPath $filePath)) { return }
@@ -64,6 +56,7 @@
 		}
 
 		$taskData = Import-PSFClixml -Path $filePath
+		Remove-Item -LiteralPath $filePath -Force
 		Remove-SHCredential -Name $taskData.From
 		Remove-SHCredential -Name $taskData.To
 	}

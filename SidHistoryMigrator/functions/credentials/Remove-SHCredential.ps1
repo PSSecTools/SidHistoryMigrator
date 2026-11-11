@@ -4,34 +4,18 @@
 		Deletes a saved migration credential.
 
 	.DESCRIPTION
-		Deletes the named credential file from the Secrets directory beneath
-		SidHistoryMigrator.Path.ConfigRoot. Does nothing if the file does not exist.
-		Does not remove the encryption certificate or any task definitions.
+		Deletes a saved migration credential.
+		This usually needs not be called directly and is called as part of Remove-SHTask, when deleting the entire migration task.
+		Once a SID History Migration is complete, there is no more need to store Domain Admin credentials on disk, encrypted or not.
 
 	.PARAMETER Name
-		The exact name supplied to Export-SHCredential. Wildcards are not supported.
-
-	.INPUTS
-		None. Parameters do not accept pipeline input.
-
-	.OUTPUTS
-		None.
+		The exact name supplied to Export-SHCredential.
+		Wildcards are not supported.
 
 	.EXAMPLE
-		PS C:\> Remove-SHCredential -Name 'retired.contoso.com'
+		PS C:\> Remove-SHCredential -Name 'contoso.com'
 
 		Deletes the credential stored for the retired domain.
-
-	.NOTES
-		Credentials are shared by name. Removing a credential prevents every task
-		using that name from loading it. This command does not prompt for confirmation
-		and does not support WhatIf.
-
-	.LINK
-		Export-SHCredential
-
-	.LINK
-		Remove-SHTask
 	#>
 	[CmdletBinding()]
 	param (
@@ -46,7 +30,7 @@
 		}
 	}
 	process {
-		$filename = "$([convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Name)).Trim("=")).psd1"
+		$filename = "$([convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Name)).Trim('=')).psd1"
 		$filePath = Join-Path -Path $secretPath -ChildPath $filename
 
 		if (-not (Test-Path -Path $filePath)) { return }

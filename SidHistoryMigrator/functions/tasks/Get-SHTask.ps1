@@ -1,22 +1,19 @@
 ﻿function Get-SHTask {
 	<#
 	.SYNOPSIS
-		Retrieves saved migration task definitions.
+		Lists the registered SID History migration tasks.
 
 	.DESCRIPTION
-		Imports task definitions from the Tasks directory beneath
-		SidHistoryMigrator.Path.ConfigRoot and filters them by name. These definitions
-		contain connection and matching settings, not the scope configuration or passwords.
+		Lists the registered SID History migration tasks.
+		Tasks are the core migration configurations used to describe the main boundaries on how SID histories are migrated from where to where.
+
+		- Use New-SHTask to define new ones.
+		- Use Remove-SHTask to delete existing ones.
+		- Use Invoke-SHMigrator to execute them.
 
 	.PARAMETER Name
-		A wildcard pattern matching task names. Defaults to *, returning every task.
-
-	.INPUTS
-		None. Parameters do not accept pipeline input.
-
-	.OUTPUTS
-		System.Management.Automation.PSCustomObject
-		Saved SidHistoryMigrator.Task definitions, restored by Import-PSFClixml.
+		The name of the task to retrieve.
+		Defaults to: *
 
 	.EXAMPLE
 		PS C:\> Get-SHTask
@@ -27,12 +24,6 @@
 		PS C:\> Get-SHTask -Name 'Pilot*'
 
 		Returns task definitions whose names start with Pilot.
-
-	.LINK
-		New-SHTask
-
-	.LINK
-		Invoke-SHTask
 	#>
 	[CmdletBinding()]
 	param (
@@ -46,8 +37,8 @@
 		}
 	}
 	process {
-		Get-ChildItem -Path $taskPath -Filter *.clidat | ForEach-Object {
+		(Get-ChildItem -Path $taskPath -Filter *.clidat) | ForEach-Object {
 			Import-PSFClixml -Path $_.FullName
-		} | Where-Object Name -like $Name
+		} | Where-Object Name -Like $Name
 	}
 }

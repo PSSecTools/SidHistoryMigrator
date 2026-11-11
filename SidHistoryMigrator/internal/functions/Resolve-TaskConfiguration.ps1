@@ -61,7 +61,8 @@
 		}
 
 		try {
-			Import-PSFPowerShellDataFile -Path $effectivePath -ErrorAction Stop | ConvertTo-PSFHashtable		}
+			Import-PSFPowerShellDataFile -Path $effectivePath -ErrorAction Stop | ConvertTo-PSFHashtable 
+		}
 		catch {
 			Stop-PSFFunction -String 'Resolve-TaskConfiguration.Error.FailedToLoad' -StringValues $effectivePath -EnableException $true -Cmdlet $PSCmdlet -ErrorRecord $_
 		}
