@@ -161,7 +161,10 @@
 			}
 
 			foreach ($principal in $principals) {
-				if ($principal.AdminCount -gt 0 -and -not $Task.AllowAdminCount) { continue }
+				if ($principal.AdminCount -gt 0 -and -not $Task.AllowAdminCount) {
+					Write-Result -FromUser $principal -Status 'Skipped' -Message 'Privileged Principal (AdminCount > 0), not in scope for migration.' -Queue ActionsTaken
+					continue
+				}
 
 				$targetPrincipal = $null
 				try {

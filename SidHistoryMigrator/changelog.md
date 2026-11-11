@@ -3,6 +3,7 @@
 ## ???
 
 + Upd: New-SHSession - Added support for UPN account names
++ Upd: Invoke-SHTask - Principals skipped dueto AdminCount are now listed with reason in the action log
 + Upd: Complete help overhaul
 + Fix: Fails to detect already migrated identities
 + Fix: Accidentally includes Contacts in entities to migrate
