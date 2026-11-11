@@ -30,12 +30,14 @@ namespace SidHistoryMigrator
 
             string user = Credential.UserName;
             string domain = Environment.GetEnvironmentVariable("UserDNSDomain");
-            if (Regex.IsMatch(user, "^\\w+\\\\\\w+$"))
+            if (Regex.IsMatch(user, "^[\\w_-]+\\\\[\\w_-]+$"))
             {
                 string[] parts = user.Split('\\');
                 domain = parts[0];
                 user = parts[1];
             }
+            else if (Regex.IsMatch(user, "^\\S+@\\S+"))
+                domain = user.Split('@')[1];
 
             int result = Native.DsMakePasswordCredentials(user, domain, Credential.GetNetworkCredential().Password, out _Credential);
             if (result != 0)
