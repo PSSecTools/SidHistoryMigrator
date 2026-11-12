@@ -2,6 +2,7 @@
 
 ## ???
 
++ Upd: Remove-SHTask - no longer deletes credentials still in use by remaining tasks
 + Upd: New-SHSession - Added support for UPN account names
 + Upd: Invoke-SHTask - Principals skipped dueto AdminCount are now listed with reason in the action log
 + Upd: Complete help overhaul

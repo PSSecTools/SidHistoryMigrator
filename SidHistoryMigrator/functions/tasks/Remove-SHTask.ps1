@@ -57,7 +57,8 @@
 
 		$taskData = Import-PSFClixml -Path $filePath
 		Remove-Item -LiteralPath $filePath -Force
-		Remove-SHCredential -Name $taskData.From
-		Remove-SHCredential -Name $taskData.To
+		$remainingTaskDomains = Get-SHTask | ForEach-Object { $_.From, $_.To } | Remove-PSFNull
+		if ($remainingTaskDomains -notcontains $taskData.From) { Remove-SHCredential -Name $taskData.From }
+		if ($remainingTaskDomains -notcontains $taskData.To) { Remove-SHCredential -Name $taskData.To }
 	}
 }
