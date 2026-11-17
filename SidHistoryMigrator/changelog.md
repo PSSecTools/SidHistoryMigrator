@@ -1,6 +1,6 @@
 ﻿# Changelog
 
-## ???
+## 1.0.8
 
 + Upd: Remove-SHTask - no longer deletes credentials still in use by remaining tasks
 + Upd: New-SHSession - Added support for UPN account names

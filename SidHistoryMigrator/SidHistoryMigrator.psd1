@@ -3,7 +3,7 @@
 	RootModule         = 'SidHistoryMigrator.psm1'
 	
 	# Version number of this module.
-	ModuleVersion      = '1.0.0'
+	ModuleVersion      = '1.0.8'
 	
 	# ID used to uniquely identify this module
 	GUID               = '5537a129-7c61-4ad4-bf31-a5ebc756aa54'
